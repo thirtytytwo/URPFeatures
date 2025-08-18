@@ -1,0 +1,146 @@
+#pragma kernel Compute0
+#pragma kernel Compute1
+#pragma kernel Compute2
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RealtimeLights.hlsl"
+
+#define _MAIN_LIGHT_SHADOWS_CASCADE
+
+float4x4 _VolumeMatrices[5];
+float4x4 _VolumeMatrixInvVP;
+float4 _VolumeSize;
+float4 _DecodeParams;
+int _LocalVolumeCount;
+
+float4 _LocalOutScatterAndExtinctions[5];
+float4 _LocalEmissionAndPhaseG[5];
+float4 _GlobalOutScatterAndExtinction;
+float _GlobalPhaseG;
+
+// int _AddLightCount;
+// float4 _AddLightPosition[5];
+// float4 _AddLightColors[5];
+// float4 _AddLightDistanceAndAngle[5];
+// float4 _AddLightSpotDirections[5];
+
+RWTexture3D<float4> _MediumTexture0;
+RWTexture3D<float4> _MediumTexture1;
+RWTexture3D<float4> _LightTexture;
+RWTexture3D<float4> _CalculateTexture;
+
+float EyeDepthToProj(float lin,float4 ZBufferParams)
+{
+    return (1 / lin - ZBufferParams.w) / ZBufferParams.z;
+}
+
+float3 GetPositionWS(float3 positionNDC)
+{
+    float z = DecodeLogarithmicDepthGeneralized(positionNDC.z, _DecodeParams);
+    #if UNITY_REVERSED_Z
+    z = (1.0f - EyeDepthToProj(z, _ZBufferParams)) * 2.0f - 1.0f;
+    #else
+    z = EyeDepthToProj(z, _ZBufferParams) * 2.0f - 1.0f;
+    #endif
+    float4 positionCS = float4(positionNDC.xy * 2.0f - 1.0f, z, 1.0f);
+    #if UNITY_UV_STARTS_AT_TOP
+    positionCS.y = -positionCS.y;
+    #endif
+    float4 positionWS = mul(_VolumeMatrixInvVP, positionCS);
+    positionWS.xyz /= positionWS.w;
+    return positionWS.xyz;
+}
+
+float GetPhg(float g, float cosTheta)
+{
+    float Numer = 1.0f - g * g;
+    float Denom = max(0.001,1.0f + g * g - 2.0f * g * cosTheta);
+    return Numer / (4.0f * PI * Denom * sqrt(Denom));//1.5 = 1 + 0.5 = x * sqrt(x)
+}
+
+[numthreads(8,8,8)]
+void Compute0 (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y || id.z >= _VolumeSize.z)
+        return; // Out of bounds check
+    float3 positionNDC = (id.xyz + 0.5f) / _VolumeSize.xyz;
+    float3 positionWS = GetPositionWS(positionNDC);
+
+    float4 outScatterAndExtinction = _GlobalOutScatterAndExtinction;
+    float4 emissionAndPhaseG = 0.0f;
+    emissionAndPhaseG.a = _GlobalPhaseG;
+    float count = 1.0f;
+    
+    for (int i = 0; i < _LocalVolumeCount; i++)
+    {
+        float4 positionOS = mul(_VolumeMatrices[i], float4(positionWS.xyz, 1.0f));
+        if (all(positionOS.xyz >= -1.0f) && all(positionOS.xyz <= 1.0f))
+        {
+            outScatterAndExtinction += _LocalOutScatterAndExtinctions[i];
+            emissionAndPhaseG.rgb += _LocalEmissionAndPhaseG[i].rgb;
+            emissionAndPhaseG.a += _LocalEmissionAndPhaseG[i].a;
+            count += 1.0f;
+        }
+    }
+
+    _MediumTexture0[id] = float4(outScatterAndExtinction.rgb / outScatterAndExtinction.a, outScatterAndExtinction.a);
+    _MediumTexture1[id] = float4(emissionAndPhaseG.rgb, emissionAndPhaseG.a / count);
+}
+
+[numthreads(8,8,8)]
+void Compute1(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y || id.z >= _VolumeSize.z)
+        return; // Out of bounds check
+    float3 positionNDC = (id.xyz + 0.5f) / _VolumeSize.xyz;
+    float3 positionWS = GetPositionWS(positionNDC);
+    
+    
+    float3 lightDir = normalize(_MainLightPosition.xyz);
+    float3 viewDir = normalize(_WorldSpaceCameraPos - positionWS);
+    float cosTheta = dot(lightDir, viewDir);
+    float g = _MediumTexture1[id].a;
+    float phg = GetPhg(g, cosTheta);
+
+    float3 shadowCoord = TransformWorldToShadowCoord(positionWS);
+    float shadow = SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmapTexture, sampler_MainLightShadowmapTexture, shadowCoord.xyz);
+
+    // Directional Light (f * v * l)
+    float3 Lscat = phg * shadow * _MainLightColor.rgb;
+
+    //Indirect Light
+    //Additional Lights
+    
+
+    float3 allLscat = Lscat * _MediumTexture0[id].xyz;
+    allLscat += _MediumTexture1[id].xyz;
+    
+    _LightTexture[id] = float4(allLscat, _MediumTexture0[id].a);
+}
+
+[numthreads(8,8,1)]
+void Compute2(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y)
+        return; // Out of bounds check
+    uint3 pos = uint3(id.xy, 1);
+    float3 totalRadiance = 0.0f;
+    float totalTr = 1.0f;
+    float3 preVoxelWS = GetPositionWS((pos + float3(0.5, 0.5, -0.5)) / _VolumeSize.xyz);
+    for (int z = 0; z < _VolumeSize.z; z++)
+    {
+        pos.z = z;
+        float3 positionWS = GetPositionWS(float3(pos + 0.5) / _VolumeSize.xyz);
+        float step = distance(positionWS, preVoxelWS);
+        preVoxelWS = positionWS;
+
+        float4 lscatAndExtinction = _LightTexture[pos];
+        float tr = exp(-lscatAndExtinction.a * step);
+
+        float3 radiance = (lscatAndExtinction.rgb - lscatAndExtinction.rgb * tr) / max(lscatAndExtinction.a, 0.001f);
+        totalRadiance += radiance * totalTr;
+        totalTr *= tr;
+        _CalculateTexture[pos] = float4(totalRadiance, totalTr);
+    }
+}
+

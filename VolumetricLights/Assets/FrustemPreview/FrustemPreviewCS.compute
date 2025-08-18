@@ -1,0 +1,58 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+float4x4 _VolumeMatrices[5];
+float4x4 _VolumeMatrixVP;
+float4x4 _VolumeMatrixInvVP;
+float4 _VolumeSize;
+float4 _DecodeParams;
+int _LocalVolumeCount;
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWStructuredBuffer<float4> Result;
+
+float EyeDepthToProj(float lin,float4 ZBufferParams)
+{
+    return (1 / lin - ZBufferParams.w) / ZBufferParams.z;
+}
+
+[numthreads(8,8,8)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y || id.z >= _VolumeSize.z)
+        return; // Out of bounds check
+    float3 positionNDC = (id.xyz + 0.5f) / _VolumeSize.xyz;
+    float z = DecodeLogarithmicDepthGeneralized(positionNDC.z, _DecodeParams);
+    #if UNITY_REVERSED_Z
+    z = (1.0f - EyeDepthToProj(z, _ZBufferParams)) * 2.0f - 1.0f;
+    #else
+    z = EyeDepthToProj(z, _ZBufferParams) * 2.0f - 1.0f;
+    #endif
+    float4 positionCS = float4(positionNDC.xy * 2.0f - 1.0f, z, 1.0f);
+    #if UNITY_UV_STARTS_AT_TOP
+    positionCS.y = -positionCS.y;
+    #endif
+    float4 positionWS = mul(_VolumeMatrixInvVP, positionCS);
+    positionWS.xyz /= positionWS.w;
+    uint index = id.x + id.y * _VolumeSize.y + id.z * _VolumeSize.z * _VolumeSize.x;
+    //
+    for (int i = 0; i < _LocalVolumeCount; i++)
+    {
+        float4 positionOS = mul(_VolumeMatrices[i], float4(positionWS.xyz, 1.0f));
+        // positionOS.xyz /= positionOS.w; 
+        if (all(positionOS.xyz >= -1.0f) && all(positionOS.xyz <= 1.0f))
+        {
+            Result[index] = positionWS;
+        }
+        else
+        {
+            Result[index] = float4(0.0f, 0.0f, 0.0f, 1.0f); // Outside the volume
+        }
+    }
+    
+    //if (_LocalVolumeCount == 0) Result[index] = positionWS;
+    //Result[index] = positionWS;
+}

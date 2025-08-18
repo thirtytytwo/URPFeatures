@@ -28,7 +28,6 @@ public class CharacterShadow : MonoBehaviour
             var r = _Characters[i].GetComponentInChildren<SkinnedMeshRenderer>();
             mCharacterID[i] = r.renderingLayerMask;
         }
-        CharacterShadowData.CleanData();
     }
     
     void Update()
