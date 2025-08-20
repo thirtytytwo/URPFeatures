@@ -4,11 +4,11 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RealtimeLights.hlsl"
-
 #define _MAIN_LIGHT_SHADOWS_CASCADE
 
 float4x4 _VolumeMatrices[5];
 float4x4 _VolumeMatrixInvVP;
+float4x4 _PreVolumeMatrixVP;
 float4 _VolumeSize;
 float4 _DecodeParams;
 int _LocalVolumeCount;
@@ -18,16 +18,23 @@ float4 _LocalEmissionAndPhaseG[5];
 float4 _GlobalOutScatterAndExtinction;
 float _GlobalPhaseG;
 
-// int _AddLightCount;
-// float4 _AddLightPosition[5];
-// float4 _AddLightColors[5];
-// float4 _AddLightDistanceAndAngle[5];
-// float4 _AddLightSpotDirections[5];
+int _AddLightCount;
+float _AddLightIntensity;
+
+float4 _EncodeParams;
+float4 _JitterOffset;
+int _Flag;
+
+float4 _SHR;
+float4 _SHG;
+float4 _SHB;
 
 RWTexture3D<float4> _MediumTexture0;
 RWTexture3D<float4> _MediumTexture1;
 RWTexture3D<float4> _LightTexture;
 RWTexture3D<float4> _CalculateTexture;
+TEXTURE3D(_PreLightTexture);
+SAMPLER(sampler_PreLightTexture);
 
 float EyeDepthToProj(float lin,float4 ZBufferParams)
 {
@@ -58,12 +65,32 @@ float GetPhg(float g, float cosTheta)
     return Numer / (4.0f * PI * Denom * sqrt(Denom));//1.5 = 1 + 0.5 = x * sqrt(x)
 }
 
+
+float3 ReprojectVolumeXYZ(float3 positionWS, float4x4 preVP, float4 prevLogarithmicDepthEncodingParams)
+{
+    float4 positionNDC = mul(preVP, float4(positionWS.xyz,1.0));
+    positionNDC.xyz = positionNDC.xyz / positionNDC.w;
+    positionNDC.xyz = positionNDC.xyz * 0.5 + 0.5;
+    float z = EncodeLogarithmicDepthGeneralized(positionNDC.w, prevLogarithmicDepthEncodingParams);
+    return float3(positionNDC.xy, z);
+}
+
+float3 SampleSH(float3 N)
+{
+    float4 vA = half4(N, 1.0f);
+    float3 x1;
+    x1.r = dot(_SHR, vA);
+    x1.g = dot(_SHG, vA);
+    x1.b = dot(_SHB, vA);
+    return x1;
+}
+
 [numthreads(8,8,8)]
 void Compute0 (uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y || id.z >= _VolumeSize.z)
         return; // Out of bounds check
-    float3 positionNDC = (id.xyz + 0.5f) / _VolumeSize.xyz;
+    float3 positionNDC = (id.xyz + _JitterOffset+ 0.5f) / _VolumeSize.xyz;
     float3 positionWS = GetPositionWS(positionNDC);
 
     float4 outScatterAndExtinction = _GlobalOutScatterAndExtinction;
@@ -92,30 +119,51 @@ void Compute1(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _VolumeSize.x || id.y >= _VolumeSize.y || id.z >= _VolumeSize.z)
         return; // Out of bounds check
+    float3 jitterPositionNDC = (id.xyz + _JitterOffset + 0.5f) / _VolumeSize.xyz;
+    float3 jitterPositionWS = GetPositionWS(jitterPositionNDC);
+    
     float3 positionNDC = (id.xyz + 0.5f) / _VolumeSize.xyz;
     float3 positionWS = GetPositionWS(positionNDC);
     
-    
     float3 lightDir = normalize(_MainLightPosition.xyz);
-    float3 viewDir = normalize(_WorldSpaceCameraPos - positionWS);
+    float3 viewDir = normalize(_WorldSpaceCameraPos - jitterPositionWS);
     float cosTheta = dot(lightDir, viewDir);
     float g = _MediumTexture1[id].a;
     float phg = GetPhg(g, cosTheta);
 
-    float3 shadowCoord = TransformWorldToShadowCoord(positionWS);
+    float3 shadowCoord = TransformWorldToShadowCoord(jitterPositionWS);
     float shadow = SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmapTexture, sampler_MainLightShadowmapTexture, shadowCoord.xyz);
 
     // Directional Light (f * v * l)
     float3 Lscat = phg * shadow * _MainLightColor.rgb;
 
     //Indirect Light
+    float3 rotatedSH = viewDir * phg;
+    Lscat += max(0.0f, SampleSH(rotatedSH));
     //Additional Lights
-    
+    for (int i = 0; i < _AddLightCount; i++)
+    {
+        Light light = GetAdditionalLight(i, positionWS);
+        float addCosTheta = dot(light.direction, viewDir);
+        float addPhg = GetPhg(g, cosTheta);
+        Lscat += addPhg * light.color * light.distanceAttenuation * _AddLightIntensity;
+    }
 
     float3 allLscat = Lscat * _MediumTexture0[id].xyz;
     allLscat += _MediumTexture1[id].xyz;
+
+    float3 preVolumePos = ReprojectVolumeXYZ(positionWS, _PreVolumeMatrixVP, _EncodeParams);
+    bool inValid = any(preVolumePos < -1) || any(preVolumePos > 1) || _Flag == 0;
+
+    #if UNITY_UV_STARTS_AT_TOP
+    preVolumePos.y = 1.0f - preVolumePos.y; // Flip Y coordinate for UVs that start at the top
+    #endif
+    float4 preResult = SAMPLE_TEXTURE3D_LOD(_PreLightTexture, sampler_PreLightTexture, preVolumePos, 0.0f);
     
-    _LightTexture[id] = float4(allLscat, _MediumTexture0[id].a);
+    float4 curResult = float4(allLscat, _MediumTexture0[id].a);
+    curResult = lerp(preResult, curResult, inValid ? 1.0f : 0.2f);
+    
+    _LightTexture[id] = curResult;
 }
 
 [numthreads(8,8,1)]

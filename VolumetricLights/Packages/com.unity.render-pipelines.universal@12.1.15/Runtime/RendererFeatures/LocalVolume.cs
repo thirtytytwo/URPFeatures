@@ -11,7 +11,7 @@ public class LocalVolume : MonoBehaviour
     [Header("介质物理量")] 
     public Color OutScatter = Color.white;
     public Color Emission = Color.black;
-    [Range(0.0f, 1.0f)]public float Extinction = 0.0f;
+    [Range(0.0f, 5000.0f)]public float Extinction = 0.0f;
     [Range(-1.0f, 1.0f)] public float PhaseG = 0.0f;
 
     private void Start()
