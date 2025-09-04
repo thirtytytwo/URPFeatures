@@ -37,7 +37,7 @@ MonoBehaviour:
   FarClipPlane: 100
   VolumeSize: {x: 64, y: 64, z: 128}
   GlobalOutScatter: {r: 0.8490566, g: 0.8490566, b: 0.8490566, a: 1}
-  GlobalExtinction: 0.284
+  GlobalExtinction: 0
   GlobalPhaseG: 0.661
   LightIntensity: 10
   VolumeLightApplyMaterial: {fileID: 2100000, guid: 4d5bcb8bfe834424dbc1b80e61ea3e77,

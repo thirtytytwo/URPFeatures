@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de640fe3d0db1804a85f9fc8f5cadab6, type: 3}
+  m_Name: RayMarching_Renderer
+  m_EditorClassIdentifier: 
+  debugShaders:
+    debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7,
+      type: 3}
+  m_RendererFeatures:
+  - {fileID: 4233111855401868260}
+  m_RendererFeatureMap: e41bb9f3cd08bf3a
+  m_UseNativeRenderPass: 0
+  postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
+  xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
+  shaders:
+    blitPS: {fileID: 4800000, guid: c17132b1f77d20942aa75f8429c0f8bc, type: 3}
+    copyDepthPS: {fileID: 4800000, guid: d6dae50ee9e1bfa4db75f19f99355220, type: 3}
+    screenSpaceShadowPS: {fileID: 0}
+    samplingPS: {fileID: 4800000, guid: 04c410c9937594faa893a11dceb85f7e, type: 3}
+    stencilDeferredPS: {fileID: 4800000, guid: e9155b26e1bc55942a41e518703fe304, type: 3}
+    fallbackErrorPS: {fileID: 4800000, guid: e6e9a19c3678ded42a3bc431ebef7dbd, type: 3}
+    materialErrorPS: {fileID: 4800000, guid: 5fd9a8feb75a4b5894c241777f519d4e, type: 3}
+    coreBlitPS: {fileID: 4800000, guid: 93446b5c5339d4f00b85c159e1159b7c, type: 3}
+    coreBlitColorAndDepthPS: {fileID: 4800000, guid: d104b2fc1ca6445babb8e90b0758136b,
+      type: 3}
+    cameraMotionVector: {fileID: 4800000, guid: c56b7e0d4c7cb484e959caeeedae9bbf,
+      type: 3}
+    objectMotionVector: {fileID: 4800000, guid: 7b3ede40266cd49a395def176e1bc486,
+      type: 3}
+  m_AssetVersion: 2
+  m_OpaqueLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_TransparentLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_DefaultStencilState:
+    overrideStencilState: 0
+    stencilReference: 0
+    stencilCompareFunction: 8
+    passOperation: 2
+    failOperation: 0
+    zFailOperation: 0
+  m_ShadowTransparentReceive: 1
+  m_RenderingMode: 0
+  m_DepthPrimingMode: 0
+  m_CopyDepthMode: 0
+  m_AccurateGbufferNormals: 0
+  m_ClusteredRendering: 0
+  m_TileSize: 32
+  m_IntermediateTextureMode: 1
+--- !u!114 &4233111855401868260
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9667751e9fe687444acf9214600b7b54, type: 3}
+  m_Name: VolumetricLightRayMarchingFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  RayMarchingMaterial: {fileID: 2100000, guid: 629afe59a4292514cb717f30afaf4644, type: 2}
+  Noises:
+  - {fileID: 2800000, guid: e1a5369b37868284ab18221f10c38eae, type: 3}
+  - {fileID: 2800000, guid: 6c37e5e01de7e6646bb5005df8a4cd1f, type: 3}
+  - {fileID: 2800000, guid: 5d8ed4faae80ce946b37eb90ac93526c, type: 3}
+  - {fileID: 2800000, guid: 17afaebf80226e44992af13a8d8ff270, type: 3}
+  - {fileID: 2800000, guid: d6c200ef4c4ac33458ab9ab508012deb, type: 3}
+  - {fileID: 2800000, guid: 7fe6c16bbe1b02245b46656dbc5683ac, type: 3}
+  - {fileID: 2800000, guid: 95a1f31e1cf933741957d878234c73a8, type: 3}
+  - {fileID: 2800000, guid: 9c191f24c7d7dcb48a6f485e7301d8f7, type: 3}
+  - {fileID: 2800000, guid: 3c567b3cbbb8dfd438ddbcbc207ed95b, type: 3}
+  - {fileID: 2800000, guid: dc26a58948f6d344dbd4b9ee90b87fc8, type: 3}
+  - {fileID: 2800000, guid: 8a9ee159ab46f2346a2ccb4973000e6b, type: 3}
+  - {fileID: 2800000, guid: 3c34672c585eccb459b68c654783463a, type: 3}
+  - {fileID: 2800000, guid: 536421adf83d70f469323a912f9119f8, type: 3}
+  - {fileID: 2800000, guid: 87b2fd3015e8fad43ada05a891ab5186, type: 3}
+  - {fileID: 2800000, guid: a058f0b5b4252e1408104ec7a599b6ee, type: 3}
+  - {fileID: 2800000, guid: 5c708dcf42de8784b8802ca26c4014aa, type: 3}
+  - {fileID: 2800000, guid: 1c1fcdb88ab2a32459d4759df0ea1f6b, type: 3}
+  - {fileID: 2800000, guid: d3cbe119aa6f52449a2793447a96f7a8, type: 3}
+  - {fileID: 2800000, guid: 8e20982ecef893a41acaf4e1c3e2d48e, type: 3}
+  - {fileID: 2800000, guid: 5ff1f2a90967a4b46a1dd5a39397963c, type: 3}
+  - {fileID: 2800000, guid: 699abaa661bbecd4f828c5f2634d3786, type: 3}
+  - {fileID: 2800000, guid: 057fabe53ceca6245a5889a7d0295ac0, type: 3}
+  - {fileID: 2800000, guid: 3a05a797b05f1ea479350c0fbeaeb059, type: 3}
+  - {fileID: 2800000, guid: c18a3c881bf618d41a20f4a38a84c75c, type: 3}
+  - {fileID: 2800000, guid: e7d3a241386eb9a47bdaaaca5b5ac519, type: 3}
+  - {fileID: 2800000, guid: d16c90044ec0ce14ab3d79c1daf2365a, type: 3}
+  - {fileID: 2800000, guid: 8c4c9b8f5bc276d4088164ebe225e51f, type: 3}
+  - {fileID: 2800000, guid: 0cd14294eb666734da81ab5a4dee2474, type: 3}
+  - {fileID: 2800000, guid: 4ce1616dfbcfc034ea0272215f277c18, type: 3}
+  - {fileID: 2800000, guid: 1f95146e9c13d4242887cc676337514a, type: 3}
+  - {fileID: 2800000, guid: a6736ec3adb09cf4a9d0145ec809e32e, type: 3}
+  - {fileID: 2800000, guid: 5f2e76f161a3ab24a892f79383370e53, type: 3}
+  PhaseG: -0.394
+  Transmittance: 0.199
